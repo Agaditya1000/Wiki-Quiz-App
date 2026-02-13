@@ -1,0 +1,129 @@
+{
+    "id": 1,
+    "url": "https://en.wikipedia.org/wiki/Alan_Turing",
+    "title": "Alan Turing",
+    "summary": "Alan Mathison Turing was an English mathematician, computer scientist, logician, cryptanalyst, philosopher, and theoretical biologist. He was highly influential in the development of theoretical computer science, providing a formalisation of the concepts of algorithm and computation with the Turing machine, which can be considered a model of a general-purpose computer. Turing is widely considered to be the father of theoretical computer science and artificial intelligence.",
+    "key_entities": {
+        "people": [
+            "Alan Turing",
+            "Alonzo Church",
+            "Christopher Morcom",
+            "Max Newman"
+        ],
+        "organizations": [
+            "University of Cambridge",
+            "Princeton University",
+            "Bletchley Park",
+            "National Physical Laboratory",
+            "University of Manchester"
+        ],
+        "locations": [
+            "United Kingdom",
+            "London",
+            "Maida Vale"
+        ]
+    },
+    "sections": [
+        "Early life and education",
+        "Career and research",
+        "Cryptanalysis",
+        "Early computers and the Turing test",
+        "Pattern formation and mathematical biology",
+        "Personal life",
+        "Legacy"
+    ],
+    "quiz": [
+        {
+            "question": "Where was Alan Turing born?",
+            "options": [
+                "Oxford, England",
+                "Maida Vale, London",
+                "Cambridge, England",
+                "Manchester, England"
+            ],
+            "answer": "Maida Vale, London",
+            "difficulty": "easy",
+            "explanation": "According to the 'Early life and education' section, Turing was born in Maida Vale, London."
+        },
+        {
+            "question": "Which university did Alan Turing attend for his undergraduate studies?",
+            "options": [
+                "Harvard University",
+                "University of Cambridge",
+                "Oxford University",
+                "Princeton University"
+            ],
+            "answer": "University of Cambridge",
+            "difficulty": "easy",
+            "explanation": "Mentioned in the 'Early life and education' section — Turing studied at King's College, Cambridge."
+        },
+        {
+            "question": "What was Alan Turing's primary contribution during World War II?",
+            "options": [
+                "Developing radar systems",
+                "Breaking the German Enigma code",
+                "Inventing the atomic bomb",
+                "Designing military aircraft"
+            ],
+            "answer": "Breaking the German Enigma code",
+            "difficulty": "medium",
+            "explanation": "Detailed in the 'Cryptanalysis' section — Turing played a pivotal role in breaking the Enigma cipher at Bletchley Park."
+        },
+        {
+            "question": "What theoretical machine did Turing propose that became foundational to computer science?",
+            "options": [
+                "The Enigma Machine",
+                "The Babbage Engine",
+                "The Turing Machine",
+                "The Von Neumann Architecture"
+            ],
+            "answer": "The Turing Machine",
+            "difficulty": "medium",
+            "explanation": "Referenced in the introduction and 'Career and research' section — the Turing machine formalized the concept of computation."
+        },
+        {
+            "question": "What test did Turing propose to evaluate machine intelligence?",
+            "options": [
+                "The Lovelace Test",
+                "The Chinese Room Test",
+                "The Turing Test",
+                "The Winograd Schema Challenge"
+            ],
+            "answer": "The Turing Test",
+            "difficulty": "easy",
+            "explanation": "Discussed in the 'Early computers and the Turing test' section."
+        },
+        {
+            "question": "At which secret facility did Turing work on codebreaking during WWII?",
+            "options": [
+                "Los Alamos",
+                "Bletchley Park",
+                "Pentagon",
+                "MIT Lincoln Lab"
+            ],
+            "answer": "Bletchley Park",
+            "difficulty": "medium",
+            "explanation": "Discussed extensively in the 'Cryptanalysis' section — Bletchley Park was the wartime station for British codebreakers."
+        },
+        {
+            "question": "Which American university did Turing attend for his PhD?",
+            "options": [
+                "Harvard University",
+                "MIT",
+                "Princeton University",
+                "Stanford University"
+            ],
+            "answer": "Princeton University",
+            "difficulty": "hard",
+            "explanation": "Mentioned in the 'Career and research' section — Turing obtained his PhD from Princeton under Alonzo Church."
+        }
+    ],
+    "related_topics": [
+        "Cryptography",
+        "Enigma machine",
+        "Computer science history",
+        "Turing test",
+        "Artificial intelligence"
+    ],
+    "created_at": "2026-02-14T02:30:00Z"
+}
