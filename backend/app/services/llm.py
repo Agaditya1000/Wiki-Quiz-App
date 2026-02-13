@@ -1,14 +1,15 @@
 """
-LLM-powered quiz generation service using LangChain and Google Gemini.
-Contains prompt templates for quiz generation and entity/topic extraction.
+LLM-powered quiz generation using Google Gemini 1.5 Flash.
+Uses the google-genai SDK directly for best compatibility and control.
 """
 
 import json
 import re
+import time
 from dataclasses import dataclass, field
 
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.prompts import ChatPromptTemplate
+from google import genai
+from google.genai import types
 
 from app.config import settings
 
@@ -17,89 +18,42 @@ from app.config import settings
 # PROMPT TEMPLATES
 # ══════════════════════════════════════════════════════════════════════════════
 
-# ── Quiz Generation Prompt ───────────────────────────────────────────────────
-QUIZ_GENERATION_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """You are an expert quiz creator. Your task is to generate high-quality 
-multiple-choice quiz questions from Wikipedia article content.
+QUIZ_PROMPT = """You are an expert quiz creator. Generate {num_questions} high-quality 
+multiple-choice questions from this Wikipedia article.
 
 RULES:
-- Generate exactly {num_questions} questions.
-- Each question MUST be directly answerable from the provided article text.
-- Do NOT invent facts or use knowledge outside the article.
-- Questions should cover different sections and topics from the article.
-- Distribute difficulty levels: roughly 30% easy, 40% medium, 30% hard.
-- Each question must have exactly 4 options (A-D) with only one correct answer.
-- Explanations should reference which part of the article contains the answer.
-- Options should be plausible and not obviously wrong.
+- Each question MUST be answerable from the article text below.
+- Distribute difficulty: ~30% easy, ~40% medium, ~30% hard.
+- Each question has exactly 4 options with one correct answer.
+- Return ONLY valid JSON, no markdown fences, no extra text.
 
-OUTPUT FORMAT — respond with ONLY valid JSON (no markdown, no extra text):
-{{
-  "quiz": [
-    {{
-      "question": "Question text here?",
-      "options": ["Option A", "Option B", "Option C", "Option D"],
-      "answer": "The correct option text (must exactly match one of the options)",
-      "difficulty": "easy|medium|hard",
-      "explanation": "Brief explanation referencing the article content."
-    }}
-  ]
-}}""",
-        ),
-        (
-            "human",
-            """Generate a quiz from this Wikipedia article:
+FORMAT:
+{{"quiz": [{{"question": "...", "options": ["A","B","C","D"], "answer": "correct option text", "difficulty": "easy|medium|hard", "explanation": "..."}}]}}
 
 TITLE: {title}
 
-ARTICLE CONTENT:
+ARTICLE:
 {content}
 
-Generate exactly {num_questions} questions. Return ONLY valid JSON.""",
-        ),
-    ]
-)
+Return ONLY the JSON object."""
 
 
-# ── Entity & Topic Extraction Prompt ─────────────────────────────────────────
-ENTITY_TOPIC_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """You are an expert at extracting structured information from text.
-Extract key entities and suggest related Wikipedia topics from the article.
+ENTITY_PROMPT = """Extract key entities and suggest related topics from this article.
 
 RULES:
-- Extract real entities mentioned in the article text only.
-- Categorize entities into: people, organizations, locations.
-- Suggest 3-5 related Wikipedia topics that a reader might find interesting.
-- Related topics should be real Wikipedia article subjects.
+- Only extract entities actually mentioned in the text.
+- Suggest 3-5 related Wikipedia topics.
+- Return ONLY valid JSON, no markdown fences, no extra text.
 
-OUTPUT FORMAT — respond with ONLY valid JSON (no markdown, no extra text):
-{{
-  "key_entities": {{
-    "people": ["Person 1", "Person 2"],
-    "organizations": ["Org 1", "Org 2"],
-    "locations": ["Location 1", "Location 2"]
-  }},
-  "related_topics": ["Topic 1", "Topic 2", "Topic 3"]
-}}""",
-        ),
-        (
-            "human",
-            """Extract entities and suggest related topics from this Wikipedia article:
+FORMAT:
+{{"key_entities": {{"people": [], "organizations": [], "locations": []}}, "related_topics": []}}
 
 TITLE: {title}
 
-ARTICLE CONTENT:
+ARTICLE:
 {content}
 
-Return ONLY valid JSON.""",
-        ),
-    ]
-)
+Return ONLY the JSON object."""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -122,18 +76,17 @@ class GeneratedQuiz:
 # LLM SERVICE
 # ══════════════════════════════════════════════════════════════════════════════
 
+MODEL = "gemini-2.5-flash"
+MAX_RETRIES = 3
+RETRY_DELAYS = [15, 30, 60]
 
-def _parse_json_response(text: str) -> dict:
-    """
-    Robustly parse JSON from LLM response text.
-    Handles markdown code fences and extra text around JSON.
-    """
-    # Remove markdown code fences if present
+
+def _parse_json(text: str) -> dict:
+    """Parse JSON from LLM response, handling markdown fences."""
     text = re.sub(r"```json\s*", "", text)
     text = re.sub(r"```\s*", "", text)
     text = text.strip()
 
-    # Try to find JSON object in the text
     start = text.find("{")
     end = text.rfind("}") + 1
     if start != -1 and end > start:
@@ -141,91 +94,103 @@ def _parse_json_response(text: str) -> dict:
             return json.loads(text[start:end])
         except json.JSONDecodeError:
             pass
-
-    # If all else fails, try parsing the whole text
     return json.loads(text)
 
 
-def _get_llm() -> ChatGoogleGenerativeAI:
-    """Create and return a configured Gemini LLM instance."""
+def _get_client() -> genai.Client:
+    """Create a Gemini client."""
     if not settings.GEMINI_API_KEY:
         raise ValueError(
-            "GEMINI_API_KEY is not set. Please add it to your .env file. "
+            "GEMINI_API_KEY is not set. Add it to backend/.env. "
             "Get a free key at https://aistudio.google.com/apikey"
         )
-    return ChatGoogleGenerativeAI(
-        model="gemini-2.0-flash",
-        google_api_key=settings.GEMINI_API_KEY,
-        temperature=0.7,
-        max_output_tokens=4096,
-    )
+    return genai.Client(api_key=settings.GEMINI_API_KEY)
+
+
+def _call_gemini(client: genai.Client, prompt: str, label: str = "LLM") -> str:
+    """Call Gemini with retry logic for rate limits."""
+    for attempt in range(MAX_RETRIES):
+        try:
+            print(f"[{label}] Calling Gemini 1.5 Flash (attempt {attempt + 1})...")
+            response = client.models.generate_content(
+                model=MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.7,
+                    max_output_tokens=4096,
+                ),
+            )
+            text = response.text
+            if text:
+                print(f"[{label}] Success! ({len(text)} chars)")
+                return text
+            else:
+                print(f"[{label}] Empty response, retrying...")
+
+        except Exception as e:
+            err = str(e).lower()
+            is_rate_limit = any(kw in err for kw in [
+                "429", "quota", "rate", "resource_exhausted", "too many"
+            ])
+            if is_rate_limit and attempt < MAX_RETRIES - 1:
+                delay = RETRY_DELAYS[attempt]
+                print(f"[{label}] Rate limited. Waiting {delay}s...")
+                time.sleep(delay)
+            else:
+                raise
+
+    raise RuntimeError(f"[{label}] All retries exhausted.")
 
 
 def generate_quiz(title: str, content: str, num_questions: int = 7) -> GeneratedQuiz:
-    """
-    Generate a complete quiz from article content using Gemini LLM.
-
-    Runs two LLM calls:
-    1. Quiz generation (questions, options, answers, explanations)
-    2. Entity extraction and related topic suggestions
-
-    Args:
-        title: The article title.
-        content: The article text content.
-        num_questions: Number of questions to generate (5-10).
-
-    Returns:
-        GeneratedQuiz with questions, entities, and related topics.
-    """
-    llm = _get_llm()
+    """Generate quiz from article content using Gemini 1.5 Flash."""
+    client = _get_client()
     result = GeneratedQuiz()
 
-    # Clamp question count to valid range
     num_questions = max(5, min(10, num_questions))
 
-    # ── Step 1: Generate quiz questions ──────────────────────────────────
-    try:
-        quiz_chain = QUIZ_GENERATION_PROMPT | llm
-        quiz_response = quiz_chain.invoke({
-            "title": title,
-            "content": content,
-            "num_questions": str(num_questions),
-        })
-        quiz_data = _parse_json_response(quiz_response.content)
-        result.quiz = quiz_data.get("quiz", [])
+    # Truncate long articles
+    MAX_LEN = 10000
+    if len(content) > MAX_LEN:
+        content = content[:MAX_LEN] + "\n\n[Truncated]"
+        print(f"[LLM] Article truncated to {MAX_LEN} chars")
 
-        # Validate and clean up the quiz data
-        validated_questions = []
-        for q in result.quiz:
+    # ── Step 1: Generate quiz ────────────────────────────────────────────
+    try:
+        prompt = QUIZ_PROMPT.format(
+            num_questions=num_questions, title=title, content=content
+        )
+        raw = _call_gemini(client, prompt, label="Quiz")
+        data = _parse_json(raw)
+        questions = data.get("quiz", [])
+
+        # Validate
+        validated = []
+        for q in questions:
             if all(k in q for k in ("question", "options", "answer", "difficulty", "explanation")):
-                # Ensure difficulty is valid
                 if q["difficulty"] not in ("easy", "medium", "hard"):
                     q["difficulty"] = "medium"
-                # Ensure exactly 4 options
                 if len(q["options"]) == 4:
-                    validated_questions.append(q)
-        result.quiz = validated_questions
+                    validated.append(q)
+        result.quiz = validated
 
     except Exception as e:
-        print(f"[LLM] Quiz generation error: {e}")
-        # Return empty quiz on failure — will be handled by the router
-        result.quiz = []
+        print(f"[Quiz] Error: {e}")
 
-    # ── Step 2: Extract entities and related topics ──────────────────────
+    # Delay between calls
+    time.sleep(3)
+
+    # ── Step 2: Extract entities ─────────────────────────────────────────
     try:
-        entity_chain = ENTITY_TOPIC_PROMPT | llm
-        entity_response = entity_chain.invoke({
-            "title": title,
-            "content": content,
-        })
-        entity_data = _parse_json_response(entity_response.content)
-        result.key_entities = entity_data.get("key_entities", {
+        prompt = ENTITY_PROMPT.format(title=title, content=content)
+        raw = _call_gemini(client, prompt, label="Entities")
+        data = _parse_json(raw)
+        result.key_entities = data.get("key_entities", {
             "people": [], "organizations": [], "locations": []
         })
-        result.related_topics = entity_data.get("related_topics", [])
+        result.related_topics = data.get("related_topics", [])
 
     except Exception as e:
-        print(f"[LLM] Entity extraction error: {e}")
-        # Defaults already set in GeneratedQuiz dataclass
+        print(f"[Entities] Error: {e}")
 
     return result

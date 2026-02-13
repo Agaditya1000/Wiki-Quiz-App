@@ -7,8 +7,12 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 from app.config import settings
 
-# Create the SQLAlchemy engine
-engine = create_engine(settings.DATABASE_URL, pool_pre_ping=True)
+# Create the SQLAlchemy engine with SSL support for Neon
+engine = create_engine(
+    settings.DATABASE_URL,
+    pool_pre_ping=True,
+    connect_args={"sslmode": "require"},
+)
 
 # Session factory for creating database sessions
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

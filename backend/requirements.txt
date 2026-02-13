@@ -1,11 +1,10 @@
-fastapi==0.115.6
-uvicorn[standard]==0.34.0
-sqlalchemy==2.0.36
-psycopg2-binary==2.9.10
+fastapi==0.115.0
+uvicorn==0.30.6
+sqlalchemy==2.0.35
+psycopg2-binary==2.9.9
 beautifulsoup4==4.12.3
 requests==2.32.3
-langchain==0.3.14
-langchain-google-genai==2.0.8
-pydantic==2.10.4
+google-genai>=1.0.0
+pydantic==2.10.6
 pydantic-settings==2.7.1
 python-dotenv==1.0.1

@@ -1,21 +1,21 @@
 """
-Application configuration using Pydantic Settings.
-Reads from environment variables or .env file.
+Application configuration loaded from environment variables.
 """
 
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    """Application settings loaded from environment variables."""
+    """
+    Application settings loaded from .env file or environment variables.
+    """
 
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/wiki_quiz"
     GEMINI_API_KEY: str = ""
 
     class Config:
         env_file = ".env"
-        env_file_encoding = "utf-8"
+        extra = "ignore"
 
 
-# Singleton settings instance
 settings = Settings()
