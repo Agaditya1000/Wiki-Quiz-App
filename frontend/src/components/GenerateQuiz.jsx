@@ -7,7 +7,7 @@
 import { useState, useCallback } from 'react';
 import QuizDisplay from './QuizDisplay';
 
-const API_BASE = 'http://localhost:8000/api/quiz';
+import API_BASE from '../config';
 
 export default function GenerateQuiz() {
     const [url, setUrl] = useState('');

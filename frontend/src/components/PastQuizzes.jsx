@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import QuizModal from './QuizModal';
 
-const API_BASE = 'http://localhost:8000/api/quiz';
+import API_BASE from '../config';
 
 export default function PastQuizzes() {
     const [quizzes, setQuizzes] = useState([]);
